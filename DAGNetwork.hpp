@@ -253,7 +253,11 @@ class DAGNetwork{
             return ++layers;
         }    
 
+
+
 		size_t weightSize;
+
+		// NOTE: These unordered_map should be replaced with vector.  
         std::unordered_map<int, std::vector<int>> consumers;
         std::unordered_map<int, std::vector<int>> inputs;
         std::unordered_map<int, mlpack::Layer<mat>*> db;
