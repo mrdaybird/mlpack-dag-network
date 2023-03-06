@@ -2,4 +2,4 @@
 DAG Network for mlpack
 
 Build Instruction:
-Compile the ThyroidDAG.cpp with armadillo.
+Compile the ThyroidDAG.cpp file with armadillo.
