@@ -1,3 +1,8 @@
+/*
+	Tried to replicate the first example from ANN tutorial. To see the original code: https://github.com/mlpack/mlpack/blob/master/doc/tutorials/ann.md
+*/
+
+
 #define MLPACK_PRINT_INFO
 #define MLPACK_PRINT_WARN
 
@@ -7,6 +12,7 @@
 
 using namespace mlpack;
 using namespace std;
+
 
 int main(){
 	arma::mat trainData;
@@ -23,27 +29,34 @@ int main(){
 	/*
 		The Add method returns a unique id (which is a int at the moment but I am thinking of 
 						changing it to struct called LayerID, which is inspired by https://floooh.github.io/2018/06/17/handles-vs-pointers.html)
-		A layer could be connected to another layer using add_inputs which takes params
+		A layer could be connected to another layer using add_inputs which takes the layer id as first parameter and second parameter
+		as the std::vector<int> of input layer ids.
 	*/
     DAGNetwork g{};
-    int l1 = g.Add<Linear>(8);
-	int l2 = g.Add<Sigmoid>();
-	int l3 = g.Add<Linear>(3);
-	int l4 = g.Add<LogSoftMax>();
+    int linear1 = g.Add<Linear>(8);
+	int sigmoid = g.Add<Sigmoid>();
+	int linear2 = g.Add<Linear>(3);
+	int logsoftmax = g.Add<LogSoftMax>();
 	/* 
 		The layer corresponding to the first parameter is connected with layers in the std::vector in the second paramter.
 		Thus output of layers in the std::vector is passed to layer corresponding to the first parameter.
 
 		This function could be overloaded to take only single parameter in case the layer takes a single input.
 	*/
-	g.add_inputs(l2, {l1});
-	g.add_inputs(l3, {l2});
-	g.add_inputs(l4, {l3});
+	g.add_inputs(sigmoid, {linear1});
+	g.add_inputs(linear2, {sigmoid});
+	g.add_inputs(logsoftmax, {linear2});
+
+	/*
+	Architecture:
+		Input->Linear(8) -> Sigmoid -> Linear(3) -> LogSoftMax->Output
+		Loss: NegativeLogLikelihood
+	*/
 
 	
 	//This will be removed in the future, but currently present to make the code work.
-	g.InputLayer() = l1;
-	g.OutputLayer() = l4;
+	g.InputLayer() = linear1;
+	g.OutputLayer() = logsoftmax;
 
 	ens::Adam optimizer{};
 	g.Train(trainData, trainLabels, optimizer, ens::Report());
