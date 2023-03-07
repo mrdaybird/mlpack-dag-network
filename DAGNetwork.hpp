@@ -15,17 +15,18 @@
 using mat = arma::mat;
 using cube = arma::cube;
 class Addition : public mlpack::Layer<mat>{
-	private:
-		size_t inSize, outSize;
 	public:
 	// Requires the two inputs matrices to be joined using join_cols(). Thus 'in' mat is two matrices upper and lower matrices.
-	void Forward(const cube& in, mat& out){
-		out = arma::sum(in, 2);
+	void Forward(const mat& in, mat& out){
+		out = in.submat(0, 0, (in.n_rows/2) - 1, in.n_cols - 1) + in.submat(in.n_rows/2, 0, in.n_rows - 1, in.n_cols - 1);
 	}
-	void Backward(const cube& in, const mat& gy, cube& g){
-		g = arma::ones<cube>(arma::size(in));
-		g.each_slice() *= gy;
+	void Backward(const mat& in, const mat& gy, mat& g){
+		mat g1(in.n_rows, in.n_cols, arma::fill::ones);
+		g1 %= gy;
+		g.submat(0, 0, g.n_rows/2 - 1, g.n_cols - 1) = g1;
+		g.submat(g.n_rows/2, 0, g.n_rows - 1, g.n_cols - 1) = g1;	
 	}
+	Addition* Clone() const{ return new Addition(*this); }
 };
 
 template<typename LossLayerType = mlpack::NegativeLogLikelihood>
@@ -39,17 +40,18 @@ class DAGNetwork{
 			layerOutputs.clear();
 			layerOutputs[0] = predictors.cols(i, i + batch_size - 1);
 			ForwardDAG(outputLayer);	
-			
 			double loss = lossLayer.Forward(layerOutputs[outputLayer], responses.cols(i, i + batch_size - 1));
 			
 			//Backward Pass
-			error.fill(0);
+			error.set_size(arma::size(layerOutputs[outputLayer]));
 			lossLayer.Backward(layerOutputs[outputLayer], responses.cols(i, i + batch_size - 1), error);
 			layerBackwards.clear();
 			layerBackwards[outputLayer] = error;
 			gradient.fill(0);
+			
+			for(int i = 0; i < visitedBackward.size(); i++)
+				visitedBackward[i] = 0;
 			BackwardWithGradientDAG(inputLayer);
-
 			g = gradient;
 			return loss;
 		}
@@ -82,9 +84,10 @@ class DAGNetwork{
 				layer->Forward(layerOutputs[layerIn[0]], out);
 				layerOutputs[layerID] = std::move(out);
 			}else if(layerIn.size() > 1){
-				cube joined(layerIn.size(), layerOutputs[layerIn[0]].n_rows, layerOutputs[layerIn[0]].n_cols);
+				mat joined = layerOutputs[layerIn[0]];
+				//NOTE: Write it in a more optimized way
 				for(size_t i = 1; i < layerIn.size(); i++)
-					joined.slice(i) = layerOutputs[layerIn[1]];
+					joined = join_cols(joined, layerOutputs[layerIn[i]]);
 				mat out;
 				layer->Forward(joined, out);
 				layerOutputs[layerID] = std::move(out);
@@ -92,7 +95,7 @@ class DAGNetwork{
 		}
 
 		void BackwardWithGradientDAG(int layerID){
-			if(layerBackwards.find(layerID) != layerBackwards.end() && layerID != outputLayer)
+			if(visitedBackward[layerID] == 1)
 				return;
 			const auto& layerConsumers = consumers[layerID];
 			for(int c : layerConsumers){
@@ -102,26 +105,35 @@ class DAGNetwork{
 			auto& layer = db[layerID];
 			if(in.size() == 1){
 				mat& input = layerOutputs[in[0]];
+				mat& out = layerOutputs[layerID];
 				mat& gy = layerBackwards[layerID];
-				mat g;
-				layer->Backward(input, gy, g);
+				mat g(out.n_rows, out.n_cols);
+				layer->Backward(out, gy, g);
 				layer->Gradient(input, gy, layerGradients[layerID]);
-				layerBackwards[in[0]] = g;
-			}else if(in.size() > 1){/*
-				cube input(in.size(), layerOutputs[in[0]].n_rows, layerOutputs[in[0]].n_cols);
-				for(size_t i = 0; i < in.size(); i++)
-					input.slice(i) = layerOutputs[in[i]];
-
+				if(layerBackwards.find(in[0]) == layerBackwards.end())
+					layerBackwards[in[0]] = g;
+				else
+					layerBackwards[in[0]] += g;
+			}else if(in.size() == 2){
+				mat input = join_cols(layerOutputs[in[0]], layerOutputs[in[1]]);
+				mat& out = layerOutputs[layerID];
 				mat& gy = layerBackwards[layerID];
-				cube g;
-				layer->Backward(input, gy, g);
-				for(size_t i = 0; i < in.size(); i++){
-					if(layerBackwards.find(in[i]) == layerBackwards.end())
-						layerBackwards[in[i]] = g.slice(i);
-					else
-						layerBackwards[in[i]] += g.slice(i);
-				}*/
+				mat g(input.n_rows, input.n_cols);
+				layer->Backward(out, gy, g);
+				layer->Gradient(input, gy, layerGradients[layerID]);
+				if(layerBackwards.find(in[0]) == layerBackwards.end())
+					layerBackwards[in[0]] = g.submat(0, 0, input.n_rows/2 - 1, input.n_cols - 1);
+				else
+					layerBackwards[in[0]] += g.submat(0, 0, input.n_rows/2 - 1, input.n_cols - 1);
+				if(layerBackwards.find(in[1]) == layerBackwards.end())
+					layerBackwards[in[1]] = g.submat(input.n_rows/2, 0, input.n_rows - 1, input.n_cols - 1);	
+				else
+					layerBackwards[in[1]] += g.submat(input.n_rows/2, 0, input.n_rows - 1, input.n_cols - 1);	
+						
+			}else if(in.size() > 2){
+				//Not implemented
 			}
+			visitedBackward[layerID] = 1;
 		}
 
 		template<typename OptimizerType, typename ...Args>
@@ -144,6 +156,13 @@ class DAGNetwork{
 
 			ForwardDAG(outputLayer);
 			return layerOutputs[outputLayer];
+		}
+
+		const auto& getOutputOf(int layerID){
+			return layerOutputs[layerID];	
+		}
+		const auto& getBackwardOf(int layerID){
+			return layerBackwards[layerID];
 		}
 		void findInputAndOutputLayers(){
 			for(const auto& [id, inputVector] : inputs){
@@ -197,7 +216,6 @@ class DAGNetwork{
 				q.pop();
 				auto& layer = db[top];
 					size_t size = layer->WeightSize();
-					//std::cout << size << ' ' << start << ' ' << weightSize << std::endl;
 					assert(size + start <= weightSize);
 					layer->SetWeights(ptr + start);
 					mlpack::MakeAlias(layerGradients[top], gradientptr + start, size, 1);	
@@ -225,6 +243,8 @@ class DAGNetwork{
 			gradient.zeros(weightSize, 1); 
 			SetLayerMemory();	
 			inputs[inputLayer].push_back(0);
+			std::vector<int> v(layers+1, 0);
+			visitedBackward = std::move(v);
 			checkDone = true;
 		}
 
@@ -264,6 +284,7 @@ class DAGNetwork{
 		std::unordered_map<int, mat> layerOutputs;
 		std::unordered_map<int, mat> layerBackwards;
 		std::unordered_map<int, mat> layerGradients;
+		std::vector<int> visitedBackward;
 		int inputLayer, outputLayer;
 		LossLayerType lossLayer;
 		bool setInputLayer = false;
