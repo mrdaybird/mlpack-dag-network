@@ -9,13 +9,7 @@
 using namespace mlpack;
 using namespace std;
 
-/*	Overview of single residual block:
- *		bn=batch norm
- *
- * 	   --------> conv1x1 -> bn --------------------.
- *   /											   v
- *  x -> conv3x3 -> bn -> relu -> conv1x1 -> bn -> + -> output
- *
+/*	Overview of a single residual block: https://raw.githubusercontent.com/rasbt/stat453-deep-learning-ss21/2202699c5fd38af398e2682f289a0868b1b91f0e/L14/2-resnet-ex/resnet-ex-1-1.png 
  * */
 
 
