@@ -7,6 +7,27 @@ using namespace mlpack;
 using namespace arma;
 using namespace std;
 
+
+class ResNet18{
+	public:
+		ResNet18(const std::vector<size_t>& _channels) : channels(_channels)
+		{}
+		auto& Model(){
+			if(created)
+				return g;
+			
+			int x = g.InputLayer();
+
+
+			created = true;
+			return g;
+		}
+	private:
+		DAGNetwork g{};
+		bool created = false;
+		std::vector<size_t> channels;
+};
+
 int main(){
 	mat dataX, labels;
 	data::Load("data/digit-recognizer/train.csv", dataX, true, true);
