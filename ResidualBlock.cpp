@@ -35,7 +35,7 @@ int ResidualBlock(DAGNetwork& model, int inputLayer, std::vector<size_t> channel
 	// x-> conv1x1_2 -> bn3
 	model.sequential({x, conv1x1_2, bn3});
 	
-	// Addition is a layer not yet define, but it add output of different layers, and performs backward pass for each of the input layers. At the moment this is the only solution I could think of, we would more layers like this to support few different functions.
+	// Addition is a layer not yet defined, but it adds output of different layers, and performs backward pass for each of the input layers. At the moment this is the only solution I could think of, we would more layers like this to support few different functions.
 	int addlayers = model.Add<Addition>();
 	// Connects the 'bn2' and 'bn2' to the 'addLayer' layer.
 	model.add_inputs(addLayers, {bn2, bn3});
