@@ -9,6 +9,16 @@
 using namespace mlpack;
 using namespace std;
 
+/*	Overview of single residual block:
+ *		bn=batch norm
+ *
+ * 	   --------> conv1x1 -> bn --------------------.
+ *   /											   v
+ *  x -> conv3x3 -> bn -> relu -> conv1x1 -> bn -> + -> output
+ *
+ * */
+
+
 int ResidualBlock(DAGNetwork& model, int inputLayer, std::vector<size_t> channels){
 	if(channels.size() != 3){
 		std::cout << "Please give 3 channel sizes" << std::endl;
