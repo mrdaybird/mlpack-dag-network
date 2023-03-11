@@ -15,7 +15,8 @@ class ResNet{
 		
 		int Block(int inputLayer, int planes, bool downsample, std::vector<int> stride, DAGNetwork<NegativeLogLikelihood>& model){
 			int x = inputLayer;
-			// Each layer is represented by an unique id and Add function return the id.
+			// Each layer is represented by an unique id and Add function return the id. In future, we can create a LayerID/Node class which
+			// could make things even easier and better.
 			int conv3x3_1 = model.Add<Convolution>(planes,3, 3, stride[0], stride[1], 1, 1);
 			int bn1 = model.Add<BatchNorm>();
 			int relu1 = model.Add<ReLU>();
@@ -55,7 +56,8 @@ class ResNet{
 			
 			// x -> con3x3 -> bn1 -> relu1 -> maxpool
 			x = g.sequential({x, conv3x3, bn1, relu1, maxpool});
-		
+	
+			// Creates a subgraph and connect in with previous values
 			for(int i = 0; i < layers[0]; i++)
 				x = Block(x, 64, false, {1, 1}, g);
 
@@ -83,6 +85,7 @@ class ResNet{
 			if(modelCreated)
 				return g;
 			createModel();
+			modelCreated = true;
 			return g;
 		}
 	private:
