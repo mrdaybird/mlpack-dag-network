@@ -15,7 +15,7 @@ class ResNet{
 		
 		int Block(int inputLayer, int planes, bool downsample, std::vector<int> stride, DAGNetwork<NegativeLogLikelihood>& model){
 			int x = inputLayer;
-			// Each layer is represented by an unique id and Add function return the id. In future, we can create a LayerID/Node class which
+			// Each layer is represented by an unique id and Add function return the id. In future, we can create a LayerID/Node class/struct which
 			// could make things even easier and better.
 			int conv3x3_1 = model.Add<Convolution>(planes,3, 3, stride[0], stride[1], 1, 1);
 			int bn1 = model.Add<BatchNorm>();
@@ -94,6 +94,20 @@ class ResNet{
 		std::vector<int> layers;
 		int num_classes;
 };
+/*
+ * Ideas/Notes->
+ * 1. The unique id could be wrapped around in a Node class, which would support operator such as +, %, or methods such as concat etc.
+ * 		eg- Node x = ... , y = ...;
+ * 			Node z = x + y; // something like Add/Add_Merge layer
+ * 2. Creating another Sequential method which would take in layers(instead of Nodes), this would help users in writing less code.
+ * 		This would be very powerful when you have a function which create customized layers for you.
+ * 	 eg- auto conv3x3(int planes) return new Convolution(planes, 3, 3 ....)
+ * 	 		.
+ * 	 		.
+ * 	 	 auto conv1 = con3x3(16);
+ * 	 	 auto batchnorm = new BatchNorm();
+ * 		 auto x = Sequential({ conv1, batchnorm})
+ * */
 
 Row<size_t> getLabels(const mat& predOut)
 {
