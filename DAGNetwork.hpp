@@ -40,13 +40,17 @@ class DAGNetwork{
 		double EvaluateWithGradient(const mat& x, const size_t i, mat& g, const size_t batch_size){
  			//Forward Pass
 			InitializeForwardPassMemory(batch_size);
-
-			visitedForward.resize(layers + 1, 0);
+			layerOutputMatrix.fill(0);	
+			
+			for(int i = 0; i < visitedForward.size(); i++)
+				visitedForward[i] = 0;
 			visitedForward[inputLayer] = 1;
 			layerOutputs[inputLayer] = predictors.cols(i, i + batch_size - 1);
 			ForwardDAG(outputLayer);	
 			double loss = lossLayer.Forward(layerOutputs[outputLayer], responses.cols(i, i + batch_size - 1));
-			
+			if(loss == 0){
+//				std::cout << layerOutputs[]
+			}
 			//Backward Pass
 			InitializeBackwardPassMemory(batch_size);
 			layerDeltaMatrix.fill(0);
@@ -54,8 +58,8 @@ class DAGNetwork{
 			layerBackwards[outputLayer] = error;
 			
 			gradient.fill(0);
-			visitedBackward.resize(layers+1, 0);
-			visitedBackward[outputLayer] = 1;
+			for(int i = 0; i < visitedBackward.size(); i++)
+				visitedBackward[i] = 0;;
 			BackwardWithGradientDAG(inputLayer);
 			g = gradient;
 			return loss;
@@ -95,6 +99,15 @@ class DAGNetwork{
 			if(layerIn.size() == 1){
 				layer->Forward(layerOutputs[layerIn[0]], layerOutputs[layerID]);
 			}else if(layerIn.size() > 1){
+				if(arma::size(layerOutputs[layerIn[0]]) != arma::size(layerOutputs[layerIn[1]])){
+					for(int i = 0; i < db[layerIn[0]]->OutputDimensions().size(); i++)
+						std::cout << db[layerIn[0]]->OutputDimensions()[i];
+					std::cout << std::endl;
+					for(int i = 0; i < db[layerIn[0]]->OutputDimensions().size(); i++)
+						std::cout << db[layerIn[0]]->OutputDimensions()[i];
+					std::cout << std::endl;
+					std::runtime_error("Dimensions are not equal!");
+				}
 				mat joined = layerOutputs[layerIn[0]];
 				//NOTE: Write it in a more optimized way
 				for(size_t i = 1; i < layerIn.size(); i++)
@@ -151,6 +164,7 @@ class DAGNetwork{
 				inputDimensions = {predictors.n_rows};
 			}
 			checkAndInitialize();
+			setTrainingMode(true);
 			optimizer.Optimize(*this, parameter, callbacks...);			
 		}
 
@@ -159,32 +173,45 @@ class DAGNetwork{
 				std::cerr << "Input or Output Layer not set" << std::endl;
 			}
 			predictors = x;
-			checkAndInitialize();
-	
-			layerOutputs[inputLayer] = x;
 			if(inputDimensions.size() == 0){
 				inputDimensions = {x.n_rows};
 			}
+		
+			checkAndInitialize();
+			setTrainingMode(false);
 			InitializeForwardPassMemory(x.n_cols);
+			layerOutputMatrix.fill(0);
+			for(int i = 0; i < visitedForward.size(); i++)
+				visitedForward[i] = 0;
+			visitedForward[inputLayer] = 1;
+
+			layerOutputs[inputLayer] = x;	
 			ForwardDAG(outputLayer);
 			return layerOutputs[outputLayer];
 		}
-		void InitializeForwardPassMemory(size_t batchSize){
-//			if(batchSize * totalOutputSize > layerOutputMatrix.n_elem || batchSize * totalOutputSize < std::floor(0.1*layerOutputMatrix.n_elem)){
-				layerOutputMatrix = mat(1, batchSize * totalOutputSize);
-//			}
-			size_t start = 0;
+		void setTrainingMode(bool value){
 			for(auto&[id, layer] : db){
-				if(id == inputLayer) continue;
+				layer->Training() = value;
+			}
+		}
+		void InitializeForwardPassMemory(size_t batchSize){
+			if(batchSize * totalOutputSize > layerOutputMatrix.n_elem || batchSize * totalOutputSize < std::floor(0.1*layerOutputMatrix.n_elem)){
+				layerOutputMatrix = mat(1, batchSize * totalOutputSize);
+			}
+			size_t start = 0;
+			size_t layerOutputSize = inSize;
+			mlpack::MakeAlias(layerOutputs[inputLayer], layerOutputMatrix.colptr(start), layerOutputSize, batchSize);
+			start += layerOutputSize * batchSize;	
+			for(auto&[id, layer] : db){
 				const size_t layerOutputSize = layer->OutputSize();
 				mlpack::MakeAlias(layerOutputs[id], layerOutputMatrix.colptr(start), layerOutputSize, batchSize);
 				start += layerOutputSize * batchSize;
 			}
 		}	
 		void InitializeBackwardPassMemory(size_t batchSize){
-			//if(batchSize * totalInputSize > layerDeltaMatrix.n_elem || batchSize * totalInputSize < std::floor(0.1*layerDeltaMatrix.n_elem)){
+			if(batchSize * totalInputSize > layerDeltaMatrix.n_elem || batchSize * totalInputSize < std::floor(0.1*layerDeltaMatrix.n_elem)){
 				layerDeltaMatrix = mat(1, batchSize * totalInputSize);
-			//}
+			}
 			size_t start = 0;
 			for(auto&[id, layer] : db){
 				if(id == outputLayer) continue;
@@ -195,10 +222,8 @@ class DAGNetwork{
 				mlpack::MakeAlias(layerBackwards[id], layerDeltaMatrix.colptr(start), layerInputSize, batchSize);
 				start += layerInputSize * batchSize;
 			}	
-			size_t layerOutputSize = 1;
-			for(size_t i = 0; i < inputDimensions.size(); i++)
-				layerOutputSize *= inputDimensions[i];
-			mlpack::MakeAlias(layerBackwards[0], layerDeltaMatrix.colptr(start), layerOutputSize, batchSize);
+			size_t layerOutputSize = inSize;
+			mlpack::MakeAlias(layerBackwards[inputLayer], layerDeltaMatrix.colptr(start), layerOutputSize, batchSize);
 			start += layerOutputSize * batchSize;
 		}
 		const auto& getOutputOf(int layerID){
@@ -276,7 +301,9 @@ class DAGNetwork{
 			size_t layerOutputSize = inputDimensions[0];
 			for(size_t i = 1; i < inputDimensions.size(); i++)
 				layerOutputSize *= inputDimensions[i];
+			inSize = layerOutputSize;
 			totalOutputSize += layerOutputSize;
+			totalInputSize += layerOutputSize;
 			ComputeOutputDimensions(outputLayer, visited);
 		}
 		void findWeightSize(){
@@ -305,6 +332,9 @@ class DAGNetwork{
 				size_t size = layer->WeightSize();
 				assert(size + start <= weightSize);
 				layer->SetWeights(param_ptr + start);
+				mat Wtemp;
+				mlpack::MakeAlias(Wtemp, param_ptr + start, size, 1);
+				layer->CustomInitialize(Wtemp, size);
 				mlpack::MakeAlias(layerGradients[top], gradientptr + start, size, 1);	
 				start += size; 
 				auto& cons = consumers[top];
@@ -329,6 +359,8 @@ class DAGNetwork{
 			parameter -= 1;
 			gradient.zeros(weightSize, 1); 
 			SetLayerMemory();	
+			visitedForward.resize(layers + 1, 0);
+			visitedBackward.resize(layers + 1, 0);
 			checkDone = true;
 		}
 
@@ -367,6 +399,11 @@ class DAGNetwork{
 		void add_edges(const Ts (&...x)[2]){
 			add_edges(std::make_pair(x[0], x[1])...);
 		}
+		int sequential(std::vector<int> list){
+			for(size_t i = 1; i < list.size(); i++)
+				add_input(list[i], list[i-1]); 
+			return list.back();
+		}
        	~DAGNetwork(){
 			for(auto&[id, layer] : db){
 				delete layer;
@@ -389,6 +426,7 @@ class DAGNetwork{
 		size_t totalOutputSize = 0;
 		mat layerDeltaMatrix;
 		size_t totalInputSize = 0;
+		size_t inSize = 0;
 		std::unordered_map<int, mat> layerOutputs;
 		std::unordered_map<int, mat> layerBackwards;
 		std::unordered_map<int, mat> layerGradients;

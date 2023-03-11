@@ -8,31 +8,12 @@ using namespace arma;
 using namespace std;
 
 
-class ResNet18{
-	public:
-		ResNet18(const std::vector<size_t>& _channels) : channels(_channels)
-		{}
-		auto& Model(){
-			if(created)
-				return g;
-			
-			int x = g.InputLayer();
-
-
-			created = true;
-			return g;
-		}
-	private:
-		DAGNetwork g{};
-		bool created = false;
-		std::vector<size_t> channels;
-};
 
 int main(){
 	mat dataX, labels;
 	data::Load("data/digit-recognizer/train.csv", dataX, true, true);
 	
-	dataX = dataX.cols(0, 7999);
+	dataX = dataX.cols(0, 2000);
 	labels = dataX.row(0);
 	dataX.shed_row(0);
 	dataX /= 255.0;
@@ -65,7 +46,7 @@ int main(){
 	g.InputDimensions() = {28, 28};
 	g.OutputLayer() = logsoftmax;
 	
-	ens::SGD optimizer;
-	g.Train(trainX,trainY, optimizer, ens::Report(), ens::PrintLoss());
+	ens::SGD optimizer{0.01, 32, 1*trainX.n_cols};
+	g.Train(trainX,trainY, optimizer, ens::ProgressBar(),  ens::Report(), ens::PrintLoss());
 }
 

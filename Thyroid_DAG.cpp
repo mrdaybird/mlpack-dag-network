@@ -49,6 +49,8 @@ int main(){
 	g.add_inputs(linear2, {sigmoid});
 	g.add_inputs(logsoftmax, {linear2});
 
+	// After revision the above could be written as: g.sequential({x, linear1, sigmoid, linear2, logsoftmax});
+
 	/*
 	Architecture:
 		Input->Linear(8) -> Sigmoid -> Linear(3) -> LogSoftMax->Output
@@ -60,9 +62,8 @@ int main(){
 	//g.InputLayer() = linear1;
 	g.OutputLayer() = logsoftmax;
 
-	ens::Adam optimizer{};
-	g.Train(trainData, trainLabels, optimizer, ens::Report());
-	std::cout << arma::size(trainData) << std::endl;
+	ens::RMSProp optimizer{};
+	g.Train(trainData, trainLabels, optimizer, ens::Report() );
 	mat predictionTemp = g.Predict(testData);
 	arma::mat prediction = arma::zeros<arma::mat>(1, predictionTemp.n_cols);
 
