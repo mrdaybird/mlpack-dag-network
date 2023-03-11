@@ -33,6 +33,7 @@ int main(){
 		as the std::vector<int> of input layer ids.
 	*/
     DAGNetwork g{};
+	int x = g.InputLayer();
     int linear1 = g.Add<Linear>(8);
 	int sigmoid = g.Add<Sigmoid>();
 	int linear2 = g.Add<Linear>(3);
@@ -43,9 +44,12 @@ int main(){
 
 		This function could be overloaded to take only single parameter in case the layer takes a single input.
 	*/
+	g.add_inputs(linear1, {x});
 	g.add_inputs(sigmoid, {linear1});
 	g.add_inputs(linear2, {sigmoid});
 	g.add_inputs(logsoftmax, {linear2});
+
+	// After revision the above could be written as: g.sequential({x, linear1, sigmoid, linear2, logsoftmax});
 
 	/*
 	Architecture:
@@ -55,11 +59,11 @@ int main(){
 
 	
 	//This will be removed in the future, but currently present to make the code work.
-	g.InputLayer() = linear1;
+	//g.InputLayer() = linear1;
 	g.OutputLayer() = logsoftmax;
 
-	ens::Adam optimizer{};
-	g.Train(trainData, trainLabels, optimizer, ens::Report());
+	ens::RMSProp optimizer{};
+	g.Train(trainData, trainLabels, optimizer, ens::Report() );
 	mat predictionTemp = g.Predict(testData);
 	arma::mat prediction = arma::zeros<arma::mat>(1, predictionTemp.n_cols);
 

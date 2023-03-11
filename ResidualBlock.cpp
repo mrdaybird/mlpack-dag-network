@@ -1,3 +1,6 @@
+//NOTE: This does not work at the momemt. :(, hopefully it works soon.
+// This is a prototype of the api of DAGNetwork. 
+
 #define MLPACK_PRINT_INFO
 #define MLPACK_PRINT_WARN
 
@@ -6,22 +9,53 @@
 using namespace mlpack;
 using namespace std;
 
+/*	Overview of a single residual block: https://raw.githubusercontent.com/rasbt/stat453-deep-learning-ss21/2202699c5fd38af398e2682f289a0868b1b91f0e/L14/2-resnet-ex/resnet-ex-1-1.png 
+ * */
+
+
+int ResidualBlock(DAGNetwork& model, int inputLayer, std::vector<size_t> channels){
+	if(channels.size() != 3){
+		std::cout << "Please give 3 channel sizes" << std::endl;
+		return;
+	}
+	int x = inputLayer;
+	int conv3x3 = model.Add<Convolution>(channels[0], 3, 3, 2, 2, 1, 1);
+	int bn1 = model.Add<BatchNorm>(channels[0]);
+	int relu = model.Add<ReLU>();
+	int conv1x1_1 = model.Add<Convolution>(channels[1], 1, 1, 2, 2, 0, 0);
+	int bn2 = model.Add<BatchNorm>(channels[1]);
+
+	// Created directed edges: 
+	// x-> con3x3-> bn1-> relu-> conv1x1_1-> bn2
+	model.sequential({x, conv3x3, bn1, relu, conv1x1_1, bn2});
+	// This could allow creating the layers inplace(i.e. inside the sequential method
+	
+	int conv1x1_2 = model.Add<Convolution>(channels[1], 1, 1, 2, 2, 0, 0);
+	int bn3 = model.Add<BatchNorm>(channels[1]);
+	// x-> conv1x1_2 -> bn3
+	model.sequential({x, conv1x1_2, bn3});
+	
+	// Addition is a layer not yet defined, but it adds output of different layers, and performs backward pass for each of the input layers. At the moment this is the only solution I could think of, we would more layers like this to support few different functions.
+	int addlayers = model.Add<Addition>();
+	// Connects the 'bn2' and 'bn2' to the 'addLayer' layer.
+	model.add_inputs(addLayers, {bn2, bn3});
+	
+	int relu_1 = model.Add<ReLU>();
+	// addLayers -> relu_1
+	model.add_input(relu_1, addlayers);
+
+	// Return the last layer that can be connected to other layers or create another residual blocks.
+	return relu_1;
+}
+
+
 int main(){
 	DAGNetwork g{};
-	int l1 = g.Add<Identity>();
-	int l2 = g.Add<Sigmoid>();
-	int l3 = g.Add<Addition>();
-	g.add_inputs(l2, {l1});
-	g.add_inputs(l3, {l2, l1});
+	int x = g.InputLayer();
+	//Channels Block1:(1->4->8) Block2:(8->16->32)
+	x = ResidualBlock(g, x, {4, 8});
+	x = ResidualBlock(g, x, {16, 32});
 	
-	g.InputLayer() = l1;
-	g.OutputLayer() = l3;
-	arma::mat x(1, 5, arma::fill::ones);
-	arma::mat y(1, 5, arma::fill::zeros);
-	ens::SGD optimizer(1, 5, 1*5);
-	g.Train(x, y, optimizer, ens::Report(), ens::PrintLoss());
-	arma::mat d = g.getBackwardOf(1);
-	std::cout << d;
-	arma::mat out = g.getOutputOf(l3);
-	std::cout << out;
+	int linear1 = g.Add<Linear>(10);
+	g.add_input(linear_1, x);
 }
