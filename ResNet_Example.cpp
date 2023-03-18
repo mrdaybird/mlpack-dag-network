@@ -2,6 +2,7 @@
 #define MLPACK_PRINT_WARN
 
 #include "DAGNetwork.hpp"
+#include <omp.h>
 
 using namespace mlpack;
 using namespace arma;
@@ -49,13 +50,13 @@ class ResNet{
 		void createModel(){
 			// The input is also given a unique id, making the input reusable.
 			int x = g.InputLayer();
-			int conv3x3 = g.Add<Convolution>(64, 7, 7, 2, 2, 3, 3);
+			int conv7x7 = g.Add<Convolution>(64, 7, 7, 2, 2, 3, 3);
 			int bn1 = g.Add<BatchNorm>();
 			int relu1 = g.Add<ReLU>();
 			int maxpool = g.Add<MaxPooling>(3, 3, 2, 2);
 			
-			// x -> con3x3 -> bn1 -> relu1 -> maxpool
-			x = g.sequential({x, conv3x3, bn1, relu1, maxpool});
+			// x -> con7x7 -> bn1 -> relu1 -> maxpool
+			x = g.sequential({x, conv7x7, bn1, relu1, maxpool});
 	
 			// Creates a subgraph and connect in with previous values
 			for(int i = 0; i < layers[0]; i++)
@@ -121,6 +122,9 @@ Row<size_t> getLabels(const mat& predOut)
 	
 
 int main(){
+	omp_set_dynamic(0);     // Explicitly disable dynamic teams
+	omp_set_num_threads(4); // Use 4 threads for all consecutive parallel regions	
+	
 	mat dataX, labels;
 	data::Load("data/digit-recognizer/train.csv", dataX, true, true);
 	
@@ -136,8 +140,8 @@ int main(){
 	
 	model.InputDimensions() = {28, 28};
 
-	ens::RMSProp optimizer{0.01, 32, 0.99, 1e-8, 1*validX.n_cols};
-	model.Train(validX, validY, optimizer, ens::ProgressBar(),  ens::Report(), ens::PrintLoss());
+	ens::SGD optimizer{0.01, 32,  2*trainX.n_cols};
+	model.Train(trainX, trainY, optimizer, ens::ProgressBar(),  ens::Report(), ens::PrintLoss());
 
 	mat preds = model.Predict(validX);
 	auto predsLabels = getLabels(preds);

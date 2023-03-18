@@ -48,9 +48,9 @@ class DAGNetwork{
 			layerOutputs[inputLayer] = predictors.cols(i, i + batch_size - 1);
 			ForwardDAG(outputLayer);	
 			double loss = lossLayer.Forward(layerOutputs[outputLayer], responses.cols(i, i + batch_size - 1));
-			if(loss == 0){
+//			if(loss == 0){
 //				std::cout << layerOutputs[]
-			}
+//			}
 			//Backward Pass
 			InitializeBackwardPassMemory(batch_size);
 			layerDeltaMatrix.fill(0);
@@ -208,6 +208,16 @@ class DAGNetwork{
 				start += layerOutputSize * batchSize;
 			}
 		}	
+		/*
+		void InitializeForwardPassMemory(size_t batchSize){
+			if(batchSize * totalOutputSize > layerOutputMatrix.n_elem || batchSize * totalOutputSize < std::floor(0.1*layerOutputMatrix.n_elem)){
+				layerOutputMatrix = mat(1, batchSize * totalOutputSize);
+			}
+			size_t start = 0;
+			//What to do when edges come from the same node, do you copy the data? 1. Prevent multiple edges to exist between two nodes. 2. Still 
+			std::priority_queue q;
+
+		}*/
 		void InitializeBackwardPassMemory(size_t batchSize){
 			if(batchSize * totalInputSize > layerDeltaMatrix.n_elem || batchSize * totalInputSize < std::floor(0.1*layerDeltaMatrix.n_elem)){
 				layerDeltaMatrix = mat(1, batchSize * totalInputSize);
@@ -375,6 +385,16 @@ class DAGNetwork{
 			layerBackwards[id] = mat();
             return id;
         }
+		
+		int Add(mlpack::Layer<mat>* layer){
+			int id = getid();
+			db[id] = layer;
+			inputs[id] = {};
+			consumers[id] = {};
+			layerOutputs[id] = mat();
+			layerBackwards[id] = mat();
+			return id;
+		}
         void add_inputs(int node, std::vector<int> in){
             for(const auto i : in){
                 inputs[node].push_back(i);
@@ -403,6 +423,15 @@ class DAGNetwork{
 			for(size_t i = 1; i < list.size(); i++)
 				add_input(list[i], list[i-1]); 
 			return list.back();
+		}
+		int sequential(std::vector<mlpack::Layer<mat>*> seq){
+			int l1 = Add(seq.front());
+			for(size_t i = 1; i < seq.size(); i++){
+				int l2 = Add(seq[i]);
+				add_input(l2, l1);
+				l1 = l2;
+			}
+			return l1;
 		}
        	~DAGNetwork(){
 			for(auto&[id, layer] : db){
