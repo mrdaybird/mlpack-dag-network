@@ -29,6 +29,26 @@ class Addition : public mlpack::Layer<mat>{
 	Addition* Clone() const{ return new Addition(*this); }
 };
 
+// End
+
+template<typename MatType>
+class DataLayer : public mlpack::Layer<mat>{
+	DataLayer(const MatType& _d, bool requires_grad) : data(_d){
+		if(requires_grad)
+			grad.set_size(arma::size(data));
+	}
+	private:
+		MatType data;
+		MatType grad;
+};
+
+typedef struct Node { 
+	int id = -1; 
+	bool data = false; 
+	bool fw = true;
+	bool bw = true;
+} Node;
+
 template<typename LossLayerType = mlpack::NegativeLogLikelihood>
 class DAGNetwork{
     public:

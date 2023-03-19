@@ -123,7 +123,7 @@ Row<size_t> getLabels(const mat& predOut)
 
 int main(){
 	omp_set_dynamic(0);     // Explicitly disable dynamic teams
-	omp_set_num_threads(4); // Use 4 threads for all consecutive parallel regions	
+	omp_set_num_threads(6); // Use 4 threads for all consecutive parallel regions	
 	
 	mat dataX, labels;
 	data::Load("data/digit-recognizer/train.csv", dataX, true, true);
