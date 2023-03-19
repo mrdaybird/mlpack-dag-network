@@ -14,7 +14,7 @@ class ResNet{
 		ResNet(int num, std::vector<int> _layers = {2, 2, 2, 2}) : num_classes(num), layers(std::move(_layers)){
 		}
 		void Block(int planes, bool downsample, std::vector<int> stride){
-			auto residualBlock = new MultiLayer<mat>();
+			auto residualBlock = new AddMerge();
 			auto path1 = new MultiLayer<mat>();
 			path1->Add(new Convolution(planes, 3, 3, stride[0], stride[1], 1, 1));
 			path1->Add(new BatchNorm());
@@ -85,17 +85,18 @@ Row<size_t> getLabels(const mat& predOut)
 
 int main(){
 	omp_set_dynamic(0);     // Explicitly disable dynamic teams
-	omp_set_num_threads(4); // Use 4 threads for all consecutive parallel regions	
+	omp_set_num_threads(6); // Use 6 threads for all consecutive parallel regions	
 	
 	mat dataX, labels;
 	data::Load("../data/digit-recognizer/train.csv", dataX, true, true);
 	
-	dataX = dataX.cols(0, 2000);
-	labels = dataX.row(0);
-	dataX.shed_row(0);
-	dataX /= 255.0;
+	mat data = dataX.cols(0, 2000);
+	dataX.reset();
+	labels = data.row(0);
+	data.shed_row(0);
+	data /= 255.0;
 	mat trainX, trainY, validX, validY;
-	data::Split(dataX, labels, validX, trainX, validY, trainY, 0.8);
+	data::Split(data, labels, validX, trainX, validY, trainY, 0.8);
 	
 	ResNet resnet18(10);
 	auto& model = resnet18.Model();
@@ -105,9 +106,10 @@ int main(){
 	model.Train(trainX, trainY, optimizer, ens::PrintLoss(), ens::Report(), ens::ProgressBar());
 
 	mat preds;
-	model.Predict(validX, preds);
+	model.Predict(validX, preds, 32);
 	auto predsLabels = getLabels(preds);
-	double accuracy = accu(predsLabels == validY)/ (double)validY.n_elem * 100;
+	
+	double accuracy = accu(predsLabels == validY)/ (double)validY.n_elem * 100;	
 	std::cout << accuracy << std::endl;
 	
 	return 0;
