@@ -1,4 +1,6 @@
 # mlpack-dag-network
+[Proposal link](https://docs.google.com/document/d/1vxHrSc1glWvUqfxIodAql03rzYV9F_9ls4bT3Pwso6A)
+
 DAG Network for mlpack
 
 Working examples written using DAGNetwork class:
