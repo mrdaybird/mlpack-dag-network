@@ -1,5 +1,5 @@
 # mlpack-dag-network
-[Proposal link](https://docs.google.com/document/d/1vxHrSc1glWvUqfxIodAql03rzYV9F_9ls4bT3Pwso6A)
+[Proposal link](https://docs.google.com/document/d/1tznxFBU6UfgWLq4voV8eTg873s1JOpmCV5gZBQGAaaE/edit?usp=sharing)
 
 DAG Network for mlpack
 
